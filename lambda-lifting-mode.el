@@ -76,7 +76,8 @@
     (save-excursion
       (goto-char beg)
       (let ((regex (car subst))
-            (repl (cdr subst)))
+            (repl (cdr subst))
+            (case-fold-search nil))
         (while (re-search-forward regex end t)
           (lambda-lifting-handle-lifting (match-beginning 1) (match-end 1) repl))))))
 
