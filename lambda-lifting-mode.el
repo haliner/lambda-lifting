@@ -46,13 +46,18 @@
     ("\\<\\(undefined\\)\\>" . "⊥")
     ("\\(\\\\\\).*?->"       . "λ")
     ("\\<\\(forall\\)\\>"    . "∀")))
-
 
-;;;; Overlay Handling
+;;;; Utilities
 
 (defun lambda-lifting-genereta-spacing (width)
   (propertize " " 'display
               `(space . (:width (,width)))))
+
+(defun lambda-lifting-determine-pixel-width (beg end)
+  (car (window-text-pixel-size nil beg end)))
+
+
+;;;; Overlay Handling
 
 (defun lambda-lifting-overlay-p (overlay)
   (and (overlayp overlay)
@@ -64,13 +69,9 @@
       (when (lambda-lifting-overlay-p overlay)
         (setq result t)))))
 
-(defun lambda-lifting-determine-overlay-pixel-width (overlay)
-  (car (window-text-pixel-size nil (overlay-start overlay)
-                               (overlay-end overlay))))
-
 (defun lambda-lifting-make-overlay (beg end repl)
   (let* ((overlay (make-overlay beg end nil t nil))
-         (width (lambda-lifting-determine-overlay-pixel-width overlay)))
+         (width (lambda-lifting-determine-pixel-width beg end)))
     (overlay-put overlay 'type 'lambda-lifting)
     (overlay-put overlay 'lambda-lifting `((repl . ,repl) (width . ,width)))
     overlay))
@@ -93,6 +94,19 @@
     (overlay-put overlay 'display nil)
     (overlay-put overlay 'before-string nil)
     (overlay-put overlay 'after-string nil)))
+
+
+;;;; Text Properties
+
+(defun lambda-lifting
+
+(defun lambda-lifting-put-text-property (beg end repl)
+  (let* ((width (lambda-lifting-determine-pixel-width beg end))
+         (alist `((width . ,width) (repl . ,repl))))
+    (put-text-property beg end 'lambda-mode alist)))
+
+(defun lambda-lifting-remove-text-property (beg end)
+  (remove-list-of-text-properties beg end '(lambda-mode)))
 
 
 ;;;; Fontification
@@ -121,30 +135,17 @@
   (lambda-lifting-unfontify (point-min) (point-max)))
 
 
-;;;; Post Command Hook
-
-(defvar lambda-lifting-overlays-at-point)
-
-(defun lambda-lifting-post-cmd-func ()
-  (dolist (overlay lambda-lifting-overlays-at-point)
-    (lambda-lifting-activate-overlay overlay))
-  (setq lambda-lifting-overlays-at-point (overlays-in (1- (point)) (1+ (point))))
-  (dolist (overlay lambda-lifting-overlays-at-point)
-    (lambda-lifting-deactivate-overlay overlay)))
-
-
 ;;;; Minor mode specifications
 
 (defun lambda-lifting-initialize ()
-  (setq lambda-lifting-overlays-at-point '())
-  (add-hook 'post-command-hook 'lambda-lifting-post-cmd-func nil t)
+  (add-to-list 'font-lock-extra-managed-props 'lambda-lifting)
+  (add-to-list 'text-property-default-nonsticky '(lambda-lifting . 't))
   (jit-lock-register 'lambda-lifting-fontify))
 
 (defun lambda-lifting-finalize ()
-  (remove-hook 'post-command-hook 'lambda-lifting-post-cmd-func t)
   (jit-lock-unregister 'lambda-lifting-fontify)
   (lambda-lifting-clear)
-  (setq lambda-lifting-overlays-at-point '()))
+  (setq font-lock-extra-managed-props (delete 'lambda-lifting font-lock-extra-managed-props)))
 
 ;;;###autoload
 (define-minor-mode lambda-lifting-mode
